@@ -1,0 +1,173 @@
+
+generator client {
+  provider = "prisma-client-js"
+
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(CLIENT)
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clientProfile  ClientProfile?
+  caProfile      CAProfile?
+  createdClients Client[]       @relation("CACreatedClients")
+  invoices       Invoice[]
+  documents      Document[]
+
+  @@map("users")
+}
+
+
+model Client {
+  id          String   @id @default(uuid())
+  name        String
+  email       String
+  phone       String?
+  companyName String?
+  gstin       String?
+  pan         String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  createdBy        User              @relation("CACreatedClients", fields: [createdById], references: [id])
+  documents        Document[]
+  invoices         Invoice[]
+  complianceAlerts ComplianceAlert[]
+
+  @@map("clients")
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique
+  clientId      String
+  issuedById    String
+  amount        Decimal       @db.Decimal(10, 2)
+  tax           Decimal       @default(0) @db.Decimal(10, 2)
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime
+  description   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  client   Client @relation(fields: [clientId], references: [id])
+  issuedBy User   @relation(fields: [issuedById], references: [id])
+
+  @@map("invoices")
+}
+
+model Document {
+  id           String      @id @default(uuid())
+  filename     String
+  originalName String
+  mimetype     String
+  size         Int
+  path         String
+  category     DocCategory
+  description  String?
+  uploadedById String
+  clientId     String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  uploadedBy User   @relation(fields: [uploadedById], references: [id])
+  client     Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+model ComplianceAlert {
+  id          String      @id @default(uuid())
+  title       String
+  description String
+  dueDate     DateTime
+  status      AlertStatus @default(PENDING)
+  clientId    String
+	priority    Priority    @default(MEDIUM)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  // Relations
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  @@map("compliance_alerts")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+model CAProfile {
+  id             String  @id @default(uuid())
+  userId         String  @unique
+  licenseNumber  String  @unique
+  firm           String
+  experience     Int
+  specialization String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ca_profiles")
+}
+model ClientProfile {
+  id          String  @id @default(uuid())
+  userId      String  @unique
+  companyName String?
+  gstin       String?
+  pan         String?
+  address     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("client_profiles")
+}
+
+enum DocCategory {
+  TAX_DOCUMENTS
+  FINANCIAL_STATEMENTS
+  COMPLIANCE_DOCS
+  CONTRACTS
+  OTHERS
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+
+
+enum UserRole {
+  CLIENT
+  CA
+}
+
+
+enum AlertStatus {
+  PENDING
+  COMPLETED
+  DISMISSED
+}
